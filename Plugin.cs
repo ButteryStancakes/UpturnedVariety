@@ -5,13 +5,14 @@ using BepInEx;
 using BepInEx.Logging;
 using HarmonyLib;
 using UnityEngine;
+using System.Linq;
 
 namespace UpturnedVariety
 {
     [BepInPlugin(PLUGIN_GUID, PLUGIN_NAME, PLUGIN_VERSION)]
     public class Plugin : BaseUnityPlugin
     {
-        const string PLUGIN_GUID = "butterystancakes.lethalcompany.upturnedvariety", PLUGIN_NAME = "Upturned Variety", PLUGIN_VERSION = "1.0.0";
+        const string PLUGIN_GUID = "butterystancakes.lethalcompany.upturnedvariety", PLUGIN_NAME = "Upturned Variety", PLUGIN_VERSION = "1.0.1";
         internal static new ManualLogSource Logger;
         internal static AudioClip boombox;
         internal static Texture giftBoxTex2;
@@ -42,17 +43,25 @@ namespace UpturnedVariety
     [HarmonyPatch]
     class UpturnedVarietyPatches
     {
-        [HarmonyPatch(typeof(BoomboxItem), nameof(BoomboxItem.Start))]
+        [HarmonyPatch(typeof(StartOfRound), "Awake")]
         [HarmonyPostfix]
-        static void BoomboxItemPostStart(BoomboxItem __instance)
+        static void StartOfRoundPostAwake(StartOfRound __instance)
         {
             if (Plugin.boombox != null)
             {
-                __instance.musicAudios = new List<AudioClip>(__instance.musicAudios)
+                Item boombox = __instance.allItemsList.itemsList.FirstOrDefault(item => item.name == "Boombox");
+                if (boombox != null)
                 {
-                    Plugin.boombox
-                }.ToArray();
-                Plugin.Logger.LogInfo($"Loaded Upturned track into Boombox #{__instance.GetInstanceID()}");
+                    BoomboxItem boomboxItem = boombox.spawnPrefab.GetComponent<BoomboxItem>();
+                    if (System.Array.IndexOf(boomboxItem.musicAudios, Plugin.boombox) < 0)
+                    {
+                        boomboxItem.musicAudios = new List<AudioClip>(boomboxItem.musicAudios)
+                        {
+                            Plugin.boombox
+                        }.ToArray();
+                        Plugin.Logger.LogInfo($"Loaded Upturned track into Boombox");
+                    }
+                }
             }
         }
 
