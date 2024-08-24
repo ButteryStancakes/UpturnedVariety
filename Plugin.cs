@@ -12,7 +12,7 @@ namespace UpturnedVariety
     [BepInPlugin(PLUGIN_GUID, PLUGIN_NAME, PLUGIN_VERSION)]
     public class Plugin : BaseUnityPlugin
     {
-        const string PLUGIN_GUID = "butterystancakes.lethalcompany.upturnedvariety", PLUGIN_NAME = "Upturned Variety", PLUGIN_VERSION = "1.0.1";
+        const string PLUGIN_GUID = "butterystancakes.lethalcompany.upturnedvariety", PLUGIN_NAME = "Upturned Variety", PLUGIN_VERSION = "1.0.2";
         internal static new ManualLogSource Logger;
         internal static AudioClip boombox;
         internal static Texture giftBoxTex2;
@@ -43,6 +43,8 @@ namespace UpturnedVariety
     [HarmonyPatch]
     class UpturnedVarietyPatches
     {
+        static StartMatchLever startMatchLever;
+
         [HarmonyPatch(typeof(StartOfRound), "Awake")]
         [HarmonyPostfix]
         static void StartOfRoundPostAwake(StartOfRound __instance)
@@ -69,7 +71,10 @@ namespace UpturnedVariety
         [HarmonyPostfix]
         static void GiftBoxItemPostStart(GiftBoxItem __instance)
         {
-            if (Plugin.giftBoxTex2 != null && !StartOfRound.Instance.inShipPhase && new System.Random((int)__instance.targetFloorPosition.x + (int)__instance.targetFloorPosition.y).NextDouble() > 0.5)
+            if (startMatchLever == null)
+                startMatchLever = Object.FindObjectOfType<StartMatchLever>();
+
+            if (startMatchLever != null && Plugin.giftBoxTex2 != null && startMatchLever.leverHasBeenPulled && new System.Random((int)__instance.targetFloorPosition.x + (int)__instance.targetFloorPosition.y).NextDouble() > 0.5)
             {
                 __instance.GetComponent<Renderer>().material.mainTexture = Plugin.giftBoxTex2;
                 Plugin.Logger.LogInfo($"Gift #{__instance.GetInstanceID()} using alternate texture");
