@@ -12,10 +12,11 @@ namespace UpturnedVariety
     [BepInPlugin(PLUGIN_GUID, PLUGIN_NAME, PLUGIN_VERSION)]
     public class Plugin : BaseUnityPlugin
     {
-        const string PLUGIN_GUID = "butterystancakes.lethalcompany.upturnedvariety", PLUGIN_NAME = "Upturned Variety", PLUGIN_VERSION = "1.0.2";
+        const string PLUGIN_GUID = "butterystancakes.lethalcompany.upturnedvariety", PLUGIN_NAME = "Upturned Variety", PLUGIN_VERSION = "1.1.0";
         internal static new ManualLogSource Logger;
         internal static AudioClip boombox;
         internal static Texture giftBoxTex2;
+        internal static Material lollipop2;
 
         void Awake()
         {
@@ -26,6 +27,7 @@ namespace UpturnedVariety
                 AssetBundle upturnedBundle = AssetBundle.LoadFromFile(Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "upturnedvariety"));
                 boombox = upturnedBundle.LoadAsset<AudioClip>("Boombox");
                 giftBoxTex2 = upturnedBundle.LoadAsset<Texture>("GiftBoxTex2");
+                lollipop2 = upturnedBundle.LoadAsset<Material>("LollyPop");
                 upturnedBundle.Unload(false);
             }
             catch
@@ -61,23 +63,38 @@ namespace UpturnedVariety
                         {
                             Plugin.boombox
                         }.ToArray();
-                        Plugin.Logger.LogInfo($"Loaded Upturned track into Boombox");
+                        Plugin.Logger.LogDebug($"Loaded Upturned track into Boombox");
                     }
                 }
             }
+
+            if (startMatchLever == null)
+                startMatchLever = Object.FindObjectOfType<StartMatchLever>();
         }
 
         [HarmonyPatch(typeof(GiftBoxItem), nameof(GiftBoxItem.Start))]
         [HarmonyPostfix]
         static void GiftBoxItemPostStart(GiftBoxItem __instance)
         {
-            if (startMatchLever == null)
-                startMatchLever = Object.FindObjectOfType<StartMatchLever>();
-
-            if (startMatchLever != null && Plugin.giftBoxTex2 != null && startMatchLever.leverHasBeenPulled && new System.Random((int)__instance.targetFloorPosition.x + (int)__instance.targetFloorPosition.y).NextDouble() > 0.5)
+            if (startMatchLever != null && Plugin.giftBoxTex2 != null && startMatchLever.leverHasBeenPulled && new System.Random((int)__instance.targetFloorPosition.x + (int)__instance.targetFloorPosition.y).NextDouble() >= 0.5)
             {
                 __instance.GetComponent<Renderer>().material.mainTexture = Plugin.giftBoxTex2;
-                Plugin.Logger.LogInfo($"Gift #{__instance.GetInstanceID()} using alternate texture");
+                Plugin.Logger.LogDebug($"Gift #{__instance.GetInstanceID()} using alternate texture");
+            }
+        }
+
+        [HarmonyPatch(typeof(GrabbableObject), nameof(GrabbableObject.Start))]
+        [HarmonyPostfix]
+        static void GrabbableObjectPostStart(GrabbableObject __instance)
+        {
+            if (__instance.itemProperties.name == "Candy" && __instance.mainObjectRenderer.sharedMaterials != null && __instance.mainObjectRenderer.sharedMaterials?.Length == 2 && startMatchLever != null && Plugin.lollipop2 != null && startMatchLever.leverHasBeenPulled && new System.Random((int)__instance.targetFloorPosition.x + (int)__instance.targetFloorPosition.y).NextDouble() >= 0.5)
+            {
+                __instance.GetComponent<Renderer>().materials =
+                [
+                    Plugin.lollipop2,
+                        __instance.mainObjectRenderer.sharedMaterials[1]
+                ];
+                Plugin.Logger.LogDebug($"Candy #{__instance.GetInstanceID()} using alternate texture");
             }
         }
     }
