@@ -6,17 +6,19 @@ using BepInEx.Logging;
 using HarmonyLib;
 using UnityEngine;
 using System.Linq;
+using Unity.Netcode;
 
 namespace UpturnedVariety
 {
     [BepInPlugin(PLUGIN_GUID, PLUGIN_NAME, PLUGIN_VERSION)]
     public class Plugin : BaseUnityPlugin
     {
-        const string PLUGIN_GUID = "butterystancakes.lethalcompany.upturnedvariety", PLUGIN_NAME = "Upturned Variety", PLUGIN_VERSION = "1.1.0";
+        const string PLUGIN_GUID = "butterystancakes.lethalcompany.upturnedvariety", PLUGIN_NAME = "Upturned Variety", PLUGIN_VERSION = "1.2.0";
         internal static new ManualLogSource Logger;
         internal static AudioClip boombox;
         internal static Texture giftBoxTex2;
         internal static Material lollipop2;
+        internal static Color candyYellow = new(0.9063317f, 0.8953158f, 0.4669504f);
 
         void Awake()
         {
@@ -45,8 +47,6 @@ namespace UpturnedVariety
     [HarmonyPatch]
     class UpturnedVarietyPatches
     {
-        static StartMatchLever startMatchLever;
-
         [HarmonyPatch(typeof(StartOfRound), "Awake")]
         [HarmonyPostfix]
         static void StartOfRoundPostAwake(StartOfRound __instance)
@@ -67,35 +67,55 @@ namespace UpturnedVariety
                     }
                 }
             }
-
-            if (startMatchLever == null)
-                startMatchLever = Object.FindObjectOfType<StartMatchLever>();
         }
 
-        [HarmonyPatch(typeof(GiftBoxItem), nameof(GiftBoxItem.Start))]
+        [HarmonyPatch(typeof(RoundManager), nameof(RoundManager.SyncScrapValuesClientRpc))]
         [HarmonyPostfix]
-        static void GiftBoxItemPostStart(GiftBoxItem __instance)
+        static void PostSyncScrapValuesClientRpc(RoundManager __instance, NetworkObjectReference[] spawnedScrap)
         {
-            if (startMatchLever != null && Plugin.giftBoxTex2 != null && startMatchLever.leverHasBeenPulled && new System.Random((int)__instance.targetFloorPosition.x + (int)__instance.targetFloorPosition.y).NextDouble() >= 0.5)
+            for (int i = 0; i < spawnedScrap.Length; i++)
             {
-                __instance.GetComponent<Renderer>().material.mainTexture = Plugin.giftBoxTex2;
-                Plugin.Logger.LogDebug($"Gift #{__instance.GetInstanceID()} using alternate texture");
+                if (spawnedScrap[i].TryGet(out NetworkObject networkObject) && networkObject.TryGetComponent(out GrabbableObject grabbableObject))
+                {
+                    if (grabbableObject is GiftBoxItem)
+                    {
+                        if (Plugin.giftBoxTex2 != null && ItemVariety.GetSkinIndex(grabbableObject.targetFloorPosition) == 1)
+                        {
+                            grabbableObject.GetComponent<Renderer>().material.mainTexture = Plugin.giftBoxTex2;
+                            Plugin.Logger.LogDebug($"Gift #{networkObject.NetworkObjectId} using alternate texture");
+                        }
+                    }
+                    else if (grabbableObject.itemProperties.name == "Candy" && grabbableObject.mainObjectRenderer.sharedMaterials != null && grabbableObject.mainObjectRenderer.sharedMaterials.Length == 2 && grabbableObject.mainObjectRenderer.sharedMaterials[0].name.StartsWith("LollyPop"))
+                    {
+                        switch (ItemVariety.GetSkinIndex(grabbableObject.targetFloorPosition, Plugin.lollipop2 != null ? 3 : 2))
+                        {
+                            case 1:
+                                Material[] mats = grabbableObject.mainObjectRenderer.materials;
+                                mats[0].SetColor("_Color", Plugin.candyYellow);
+                                mats[0].SetColor("_BaseColor", Plugin.candyYellow);
+                                grabbableObject.mainObjectRenderer.materials = mats;
+                                Plugin.Logger.LogDebug($"Candy #{networkObject.NetworkObjectId} using alternate texture");
+                                break;
+                            case 2:
+                                grabbableObject.mainObjectRenderer.materials =
+                                [
+                                    Plugin.lollipop2,
+                                    grabbableObject.mainObjectRenderer.sharedMaterials[1]
+                                ];
+                                Plugin.Logger.LogDebug($"Candy #{networkObject.NetworkObjectId} using alternate texture 2");
+                                break;
+                        }
+                    }
+                }
             }
         }
+    }
 
-        [HarmonyPatch(typeof(GrabbableObject), nameof(GrabbableObject.Start))]
-        [HarmonyPostfix]
-        static void GrabbableObjectPostStart(GrabbableObject __instance)
+    internal class ItemVariety
+    {
+        internal static int GetSkinIndex(Vector3 pos, int count = 2)
         {
-            if (__instance.itemProperties.name == "Candy" && __instance.mainObjectRenderer.sharedMaterials != null && __instance.mainObjectRenderer.sharedMaterials?.Length == 2 && startMatchLever != null && Plugin.lollipop2 != null && startMatchLever.leverHasBeenPulled && new System.Random((int)__instance.targetFloorPosition.x + (int)__instance.targetFloorPosition.y).NextDouble() >= 0.5)
-            {
-                __instance.GetComponent<Renderer>().materials =
-                [
-                    Plugin.lollipop2,
-                        __instance.mainObjectRenderer.sharedMaterials[1]
-                ];
-                Plugin.Logger.LogDebug($"Candy #{__instance.GetInstanceID()} using alternate texture");
-            }
+            return new System.Random(StartOfRound.Instance.randomMapSeed + (int)pos.x + (int)pos.z).Next(count);
         }
     }
 }
