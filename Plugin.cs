@@ -1,27 +1,37 @@
-﻿using System.IO;
-using System.Reflection;
-using System.Collections.Generic;
-using BepInEx;
+﻿using BepInEx;
+using BepInEx.Bootstrap;
+using BepInEx.Configuration;
 using BepInEx.Logging;
 using HarmonyLib;
-using UnityEngine;
+using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Reflection;
 using Unity.Netcode;
-using BepInEx.Configuration;
+using UnityEngine;
 
 namespace UpturnedVariety
 {
     [BepInPlugin(PLUGIN_GUID, PLUGIN_NAME, PLUGIN_VERSION)]
+    [BepInDependency(GUID_LOBBY_COMPATIBILITY, BepInDependency.DependencyFlags.SoftDependency)]
     public class Plugin : BaseUnityPlugin
     {
-        const string PLUGIN_GUID = "butterystancakes.lethalcompany.upturnedvariety", PLUGIN_NAME = "Upturned Variety", PLUGIN_VERSION = "1.3.2";
+        internal const string PLUGIN_GUID = "butterystancakes.lethalcompany.upturnedvariety", PLUGIN_NAME = "Upturned Variety", PLUGIN_VERSION = "1.3.3";
         internal static new ManualLogSource Logger;
+
+        const string GUID_LOBBY_COMPATIBILITY = "BMX.LobbyCompatibility";
 
         internal static ConfigEntry<bool> configGift, configCandy, configPerfume, configPerfumeMeshes, configPills, configMug, configControlPad, configFish, configCandyMeshes, configSteeringWheel;
 
         void Awake()
         {
             Logger = base.Logger;
+
+            if (Chainloader.PluginInfos.ContainsKey(GUID_LOBBY_COMPATIBILITY))
+            {
+                Logger.LogInfo("CROSS-COMPATIBILITY - Lobby Compatibility detected");
+                LobbyCompatibility.Init();
+            }
 
             configGift = Config.Bind(
                 "Items",
@@ -198,21 +208,36 @@ namespace UpturnedVariety
                     {
                         ItemVariety.GetSkinIndices(grabbableObject, 2, 2);
 
-                        if (Plugin.configCandy.Value && ItemVariety.lollipop2 != null && ItemVariety.lollyStick != null && ItemVariety.tex == 1)
+                        if (Plugin.configCandy.Value && ItemVariety.lollipop2 != null && ItemVariety.lollyStick != null)
                         {
-                            grabbableObject.mainObjectRenderer.materials =
-                            [
-                                ItemVariety.lollipop2,
-                                ItemVariety.lollyStick
-                            ];
-                            Plugin.Logger.LogDebug($"Candy #{networkObject.NetworkObjectId} using alternate texture");
+                            if (ItemVariety.tex == 1)
+                            {
+                                grabbableObject.mainObjectRenderer.materials =
+                                [
+                                    ItemVariety.lollipop2,
+                                    ItemVariety.lollyStick
+                                ];
+                                Plugin.Logger.LogDebug($"Candy #{networkObject.NetworkObjectId} using alternate texture");
+                            }
 
                             if (Plugin.configCandyMeshes.Value && ItemVariety.mesh == 1)
                             {
                                 grabbableObject.mainObjectRenderer.GetComponent<MeshFilter>().mesh = ItemVariety.sucker;
                                 Plugin.Logger.LogDebug($"Candy #{networkObject.NetworkObjectId} using alternate model");
+
+                                if (ItemVariety.tex == 0)
+                                {
+                                    Material lollyPop = grabbableObject.mainObjectRenderer.materials[0];
+                                    lollyPop.SetColor("_Color", ItemVariety.candyPink);
+                                    lollyPop.SetColor("_BaseColor", ItemVariety.candyPink);
+                                    grabbableObject.mainObjectRenderer.materials =
+                                    [
+                                        lollyPop,
+                                        grabbableObject.mainObjectRenderer.sharedMaterials[1]
+                                    ];
+                                }
                             }
-                            else if (ItemVariety.lollyMesh != null)
+                            else if (ItemVariety.tex == 1 && ItemVariety.lollyMesh != null)
                                 grabbableObject.mainObjectRenderer.GetComponent<MeshFilter>().mesh = ItemVariety.lollyMesh;
                         }
                     }
@@ -240,11 +265,11 @@ namespace UpturnedVariety
                                     color = ItemVariety.perfumeBlack;
                                     transColor = ItemVariety.perfumeBlackTrans;
                                     break;
-                                // pink
-                                /*case 4:
-                                    color = ItemVariety.perfumePink;
-                                    transColor = ItemVariety.perfumePinkTrans;
-                                    break;*/
+                                    // pink
+                                    /*case 4:
+                                        color = ItemVariety.perfumePink;
+                                        transColor = ItemVariety.perfumePinkTrans;
+                                        break;*/
                             }
                             Material perfumeBottle = grabbableObject.mainObjectRenderer.materials[0];
                             perfumeBottle.SetColor("_Color", color);
@@ -253,7 +278,7 @@ namespace UpturnedVariety
                             grabbableObject.mainObjectRenderer.materials =
                             [
                                 perfumeBottle,
-                                    grabbableObject.mainObjectRenderer.sharedMaterials[1]
+                                grabbableObject.mainObjectRenderer.sharedMaterials[1]
                             ];
                             Plugin.Logger.LogDebug($"Perfume #{networkObject.NetworkObjectId} using alternate texture");
                         }
@@ -297,7 +322,7 @@ namespace UpturnedVariety
                     else if (grabbableObject.itemProperties.name == "FishTestProp" && grabbableObject.mainObjectRenderer.TryGetComponent(out MeshFilter mesh))
                     {
                         // use tex for banana chance, mesh for others
-                        ItemVariety.GetSkinIndices(grabbableObject, 9, 3);
+                        ItemVariety.GetSkinIndices(grabbableObject, 10, 3);
 
                         if (Plugin.configFish.Value)
                         {
@@ -384,7 +409,8 @@ namespace UpturnedVariety
                               fishYellow = new(0.773024f, 0.8392157f, 0.3692549f),
                               fishRed = new(0.5019608f, 0.1780566f, 0.1556078f),
                               banana = new(0.44f, 0.4296874f, 0.2028124f),
-                              stem = new(0.3799999f, 0.243271f, 0.1527103f);
+                              stem = new(0.3799999f, 0.243271f, 0.1527103f),
+                              candyPink = new(0.9063317f, 0.5387983f, 0.8062879f);
         internal static Mesh lollyMesh, sucker, fish2, sardine, sardineBanana;
         internal static Mesh[] perfumeMeshes;
 
