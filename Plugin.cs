@@ -21,7 +21,7 @@ namespace UpturnedVariety
 
         const string GUID_LOBBY_COMPATIBILITY = "BMX.LobbyCompatibility";
 
-        internal static ConfigEntry<bool> configGift, configCandy, configPerfume, configPerfumeMeshes, configPills, configMug, configControlPad, configFish, configCandyMeshes, configSteeringWheel;
+        internal static ConfigEntry<bool> configGift, configCandy, configPerfume, configPerfumeMeshes, configPills, configMug, configControlPad, configFish, configCandyMeshes, configSteeringWheel, configPickles;
 
         void Awake()
         {
@@ -103,6 +103,13 @@ namespace UpturnedVariety
                 "Enables alternate palettes for the \"Steering wheel\" item."
             );
 
+            configPickles = Config.Bind(
+                "Items",
+                "Pickles",
+                true,
+                "Enables alternate models for the \"Jar of pickles\" item."
+            );
+
             try
             {
                 AssetBundle upturnedBundle = AssetBundle.LoadFromFile(Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "upturnedvariety"));
@@ -115,7 +122,10 @@ namespace UpturnedVariety
                     ItemVariety.lollyStick = upturnedBundle.LoadAsset<Material>("LightWood");
                     ItemVariety.lollyMesh = upturnedBundle.LoadAsset<Mesh>("Cylinder.001");
                     if (configCandyMeshes.Value)
+                    {
                         ItemVariety.sucker = upturnedBundle.LoadAsset<Mesh>("Sucker");
+                        ItemVariety.candyPink = upturnedBundle.LoadAsset<Material>("CandyPink");
+                    }
                 }
                 if (configPerfumeMeshes.Value)
                 {
@@ -140,8 +150,13 @@ namespace UpturnedVariety
                     ItemVariety.sardineBanana = upturnedBundle.LoadAsset<Mesh>("Sardine.001");
                 }
                 if (configSteeringWheel.Value)
-                {
                     ItemVariety.darkPlastic = upturnedBundle.LoadAsset<Material>("DarkPlastic");
+                if (configPickles.Value)
+                {
+                    ItemVariety.glassJar = upturnedBundle.LoadAsset<Mesh>("GlassJar");
+                    ItemVariety.jarGlass = upturnedBundle.LoadAsset<Material>("GlassCase");
+                    ItemVariety.jarLid = upturnedBundle.LoadAsset<Material>("DisplayCasePlastic");
+                    ItemVariety.candyGlob = upturnedBundle.LoadAsset<GameObject>("CandyGlob");
                 }
                 upturnedBundle.Unload(false);
             }
@@ -220,19 +235,16 @@ namespace UpturnedVariety
                                 Plugin.Logger.LogDebug($"Candy #{networkObject.NetworkObjectId} using alternate texture");
                             }
 
-                            if (Plugin.configCandyMeshes.Value && ItemVariety.mesh == 1)
+                            if (Plugin.configCandyMeshes.Value && ItemVariety.mesh == 1 && (ItemVariety.tex != 0 || ItemVariety.candyPink != null))
                             {
                                 grabbableObject.mainObjectRenderer.GetComponent<MeshFilter>().mesh = ItemVariety.sucker;
                                 Plugin.Logger.LogDebug($"Candy #{networkObject.NetworkObjectId} using alternate model");
 
                                 if (ItemVariety.tex == 0)
                                 {
-                                    Material lollyPop = grabbableObject.mainObjectRenderer.materials[0];
-                                    lollyPop.SetColor("_Color", ItemVariety.candyPink);
-                                    lollyPop.SetColor("_BaseColor", ItemVariety.candyPink);
                                     grabbableObject.mainObjectRenderer.materials =
                                     [
-                                        lollyPop,
+                                        ItemVariety.candyPink,
                                         grabbableObject.mainObjectRenderer.sharedMaterials[1]
                                     ];
                                 }
@@ -265,11 +277,11 @@ namespace UpturnedVariety
                                     color = ItemVariety.perfumeBlack;
                                     transColor = ItemVariety.perfumeBlackTrans;
                                     break;
-                                    // pink
-                                    /*case 4:
-                                        color = ItemVariety.perfumePink;
-                                        transColor = ItemVariety.perfumePinkTrans;
-                                        break;*/
+                                // pink
+                                /*case 4:
+                                    color = ItemVariety.perfumePink;
+                                    transColor = ItemVariety.perfumePinkTrans;
+                                    break;*/
                             }
                             Material perfumeBottle = grabbableObject.mainObjectRenderer.materials[0];
                             perfumeBottle.SetColor("_Color", color);
@@ -388,8 +400,46 @@ namespace UpturnedVariety
                             Plugin.Logger.LogDebug($"Wheel #{networkObject.NetworkObjectId} using alternate texture");
                         }
                     }
+                    else if (grabbableObject.itemProperties.name == "PickleJar" && grabbableObject.TryGetComponent(out rend) && grabbableObject.TryGetComponent(out mesh) && rend.sharedMaterials != null && rend.sharedMaterials.Length == 2 && rend.sharedMaterials[0].name.StartsWith("JarGlass"))
+                    {
+                        ItemVariety.GetSkinIndices(grabbableObject);
+
+                        Transform pickles = grabbableObject.transform.Find("Pickles.001");
+                        if (Plugin.configPickles.Value && pickles != null && ItemVariety.glassJar != null && ItemVariety.jarGlass != null && ItemVariety.jarLid != null && ItemVariety.candyGlob != null && ItemVariety.tex == 1)
+                        {
+                            pickles.gameObject.SetActive(false);
+
+                            mesh.mesh = ItemVariety.glassJar;
+                            rend.materials =
+                            [
+                                ItemVariety.jarGlass,
+                                ItemVariety.jarLid
+                            ];
+
+                            Object.Instantiate(ItemVariety.candyGlob, grabbableObject.transform);
+
+                            ScanNodeProperties scanNodeProperties = grabbableObject.GetComponentInChildren<ScanNodeProperties>();
+                            if (scanNodeProperties != null)
+                                scanNodeProperties.headerText = scanNodeProperties.headerText.Replace("Jar of pickles", "Candy filled jar"); // replace() in case of localization
+
+                            grabbableObject.gameObject.AddComponent<CandyFilledJar>();
+
+                            Plugin.Logger.LogDebug($"Pickles #{networkObject.NetworkObjectId} is alternate");
+                        }
+                    }
                 }
             }
+        }
+
+        [HarmonyPatch(typeof(HUDManager), nameof(HUDManager.ChangeControlTipMultiple))]
+        [HarmonyPostfix]
+        static void HUDManagerPostChangeControlTipMultiple(HUDManager __instance, bool holdingItem, Item itemProperties)
+        {
+            if (!holdingItem || itemProperties.name != "PickleJar")
+                return;
+
+            if (GameNetworkManager.Instance?.localPlayerController?.currentlyHeldObjectServer?.GetComponent<CandyFilledJar>() != null)
+                __instance.controlTipLines[0].text = __instance.controlTipLines[0].text.Replace("Jar of pickles", "Candy jar");
         }
     }
 
@@ -397,10 +447,10 @@ namespace UpturnedVariety
     {
         internal static AudioClip boombox;
         internal static Texture giftBoxTex2, pillBottle2, controlPad2;
-        internal static Material lollipop2, lollyStick, coffeeMug6, darkPlastic;
+        internal static Material lollipop2, lollyStick, coffeeMug6, darkPlastic, candyPink, jarGlass, jarLid;
         internal static Color perfumeRed = new(0.9f, 0.3922666f, 0.324f, 0.6313726f),
                               perfumeRedTrans = new(1f, 0.4f, 0.4f),
-                              perfumeBlue = new(0.4509091f, 0.416f, 0.8f, 0.6313726f), // 0.4076735f, 0.368f, 0.8f
+                              perfumeBlue = new(0.4509091f, 0.416f, 0.8f, 0.6313726f),
                               perfumeBlueTrans = new(0.59f, 0.6241666f, 1f),
                               perfumeBlack = new(0.01f, 0.01f, 0.01f, 0.6313726f),
                               perfumeBlackTrans = new(0.48f, 0.48f, 0.48f),
@@ -409,10 +459,10 @@ namespace UpturnedVariety
                               fishYellow = new(0.773024f, 0.8392157f, 0.3692549f),
                               fishRed = new(0.5019608f, 0.1780566f, 0.1556078f),
                               banana = new(0.44f, 0.4296874f, 0.2028124f),
-                              stem = new(0.3799999f, 0.243271f, 0.1527103f),
-                              candyPink = new(0.9063317f, 0.5387983f, 0.8062879f);
-        internal static Mesh lollyMesh, sucker, fish2, sardine, sardineBanana;
+                              stem = new(0.3799999f, 0.243271f, 0.1527103f);
+        internal static Mesh lollyMesh, sucker, fish2, sardine, sardineBanana, glassJar;
         internal static Mesh[] perfumeMeshes;
+        internal static GameObject candyGlob;
 
         internal static HashSet<ulong> cache = [];
         internal static Dictionary<string, int> offsets = [];
