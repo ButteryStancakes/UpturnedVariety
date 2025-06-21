@@ -19,7 +19,8 @@ namespace UpturnedVariety
             new UpturnedControlPad(),
             new UpturnedFish(),
             new UpturnedSteeringWheel(),
-            new UpturnedPickles()
+            new UpturnedPickles(),
+            new UpturnedLamp()
         ];
 
         static HashSet<ulong> cache = [];

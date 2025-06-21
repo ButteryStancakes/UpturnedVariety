@@ -7,14 +7,15 @@ namespace UpturnedVariety.Defs.Items
 {
     internal class UpturnedPerfume : IUpturnedItem
     {
+        static readonly Color RED = new(0.9f, 0.3922666f, 0.324f, 0.6313726f),
+                              RED_TRANS = new(1f, 0.4f, 0.4f),
+                              BLUE = new(0.4509091f, 0.416f, 0.8f, 0.6313726f),
+                              BLUE_TRANS = new(0.59f, 0.6241666f, 1f),
+                              BLACK = new(0.01f, 0.01f, 0.01f, 0.6313726f),
+                              BLACK_TRANS = new(0.48f, 0.48f, 0.48f);
+
         static ConfigEntry<bool> enableTextures, enableMeshes;
 
-        static Color red = new(0.9f, 0.3922666f, 0.324f, 0.6313726f),
-                     redTrans = new(1f, 0.4f, 0.4f),
-                     blue = new(0.4509091f, 0.416f, 0.8f, 0.6313726f),
-                     blueTrans = new(0.59f, 0.6241666f, 1f),
-                     black = new(0.01f, 0.01f, 0.01f, 0.6313726f),
-                     blackTrans = new(0.48f, 0.48f, 0.48f);
         static Mesh[] meshes;
 
         public string GetItemName()
@@ -70,16 +71,16 @@ namespace UpturnedVariety.Defs.Items
                 switch (rand[0])
                 {
                     case 1:
-                        color = red;
-                        transColor = redTrans;
+                        color = RED;
+                        transColor = RED_TRANS;
                         break;
                     case 2:
-                        color = blue;
-                        transColor = blueTrans;
+                        color = BLUE;
+                        transColor = BLUE_TRANS;
                         break;
                     case 3:
-                        color = black;
-                        transColor = blackTrans;
+                        color = BLACK;
+                        transColor = BLACK_TRANS;
                         break;
                 }
                 Material glass = item.mainObjectRenderer.materials[0];

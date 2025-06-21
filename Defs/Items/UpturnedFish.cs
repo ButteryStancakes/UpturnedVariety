@@ -6,12 +6,13 @@ namespace UpturnedVariety.Defs.Items
 {
     internal class UpturnedFish : IUpturnedItem
     {
+        static readonly Color YELLOW_FISH = new(0.773024f, 0.8392157f, 0.3692549f),
+                              SILVER_FISH = new(0.5019608f, 0.1780566f, 0.1556078f),
+                              YELLOW_RUBBER = new(0.44f, 0.4296874f, 0.2028124f),
+                              MATERIAL_001 = new(0.3799999f, 0.243271f, 0.1527103f);
+
         static ConfigEntry<bool> enableMeshes;
 
-        static Color fishYellow = new(0.773024f, 0.8392157f, 0.3692549f),
-                     fishRed = new(0.5019608f, 0.1780566f, 0.1556078f),
-                     banana = new(0.44f, 0.4296874f, 0.2028124f),
-                     stem = new(0.3799999f, 0.243271f, 0.1527103f);
         static Mesh fish2, sardine, sardine001;
 
         public string GetItemName()
@@ -67,8 +68,8 @@ namespace UpturnedVariety.Defs.Items
                         case 1:
                             mesh.mesh = fish2;
                             Material yellowFish = item.mainObjectRenderer.materials[1];
-                            yellowFish.SetColor("_Color", fishYellow);
-                            yellowFish.SetColor("_BaseColor", fishYellow);
+                            yellowFish.SetColor("_Color", YELLOW_FISH);
+                            yellowFish.SetColor("_BaseColor", YELLOW_FISH);
                             item.mainObjectRenderer.materials = [
                                 yellowFish,
                                 item.mainObjectRenderer.sharedMaterials[0]
@@ -78,8 +79,8 @@ namespace UpturnedVariety.Defs.Items
                         case 2:
                             mesh.mesh = sardine;
                             Material silverFish = item.mainObjectRenderer.materials[1];
-                            silverFish.SetColor("_Color", fishRed);
-                            silverFish.SetColor("_BaseColor", fishRed);
+                            silverFish.SetColor("_Color", SILVER_FISH);
+                            silverFish.SetColor("_BaseColor", SILVER_FISH);
                             item.mainObjectRenderer.materials = [
                                 item.mainObjectRenderer.sharedMaterials[0],
                                 silverFish
@@ -90,10 +91,10 @@ namespace UpturnedVariety.Defs.Items
                             mesh.mesh = sardine001;
                             Material yellowRubber = item.mainObjectRenderer.materials[1];
                             Material material001 = Object.Instantiate(yellowRubber);
-                            yellowRubber.SetColor("_Color", banana);
-                            yellowRubber.SetColor("_BaseColor", banana);
-                            material001.SetColor("_Color", stem);
-                            material001.SetColor("_BaseColor", stem);
+                            yellowRubber.SetColor("_Color", YELLOW_RUBBER);
+                            yellowRubber.SetColor("_BaseColor", YELLOW_RUBBER);
+                            material001.SetColor("_Color", MATERIAL_001);
+                            material001.SetColor("_BaseColor", MATERIAL_001);
                             item.mainObjectRenderer.materials = [
                                 item.mainObjectRenderer.sharedMaterials[0],
                                 yellowRubber,
