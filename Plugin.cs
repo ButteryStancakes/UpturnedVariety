@@ -1,5 +1,6 @@
 ﻿using BepInEx;
 using BepInEx.Bootstrap;
+using BepInEx.Configuration;
 using BepInEx.Logging;
 using HarmonyLib;
 using System.Collections.Generic;
@@ -15,10 +16,12 @@ namespace UpturnedVariety
     [BepInDependency(GUID_LOBBY_COMPATIBILITY, BepInDependency.DependencyFlags.SoftDependency)]
     public class Plugin : BaseUnityPlugin
     {
-        internal const string PLUGIN_GUID = "butterystancakes.lethalcompany.upturnedvariety", PLUGIN_NAME = "Upturned Variety", PLUGIN_VERSION = "2.0.0";
+        internal const string PLUGIN_GUID = "butterystancakes.lethalcompany.upturnedvariety", PLUGIN_NAME = "Upturned Variety", PLUGIN_VERSION = "2.1.0";
         internal static new ManualLogSource Logger;
 
         const string GUID_LOBBY_COMPATIBILITY = "BMX.LobbyCompatibility";
+
+        internal static ConfigEntry<bool> configBoombox;
 
         internal static AudioClip boombox;
 
@@ -31,6 +34,12 @@ namespace UpturnedVariety
                 Logger.LogInfo("CROSS-COMPATIBILITY - Lobby Compatibility detected");
                 LobbyCompatibility.Init();
             }
+
+            configBoombox = Config.Bind(
+                "Items",
+                "Boombox",
+                true,
+                "Enables alternate models for the \"Boombox\" item.");
 
             SkinManager.LoadAllConfigs(Config);
 
@@ -56,6 +65,20 @@ namespace UpturnedVariety
     [HarmonyPatch]
     class UpturnedVarietyPatches
     {
+        static readonly Color SHINY_BOOMBOX = new(0.5799929f, 0.5799929f, 0.5799929f);
+
+        static StartMatchLever _startMatchLever;
+        static StartMatchLever StartMatchLever
+        {
+            get
+            {
+                if (_startMatchLever == null)
+                    _startMatchLever = Object.FindAnyObjectByType<StartMatchLever>();
+
+                return _startMatchLever;
+            }
+        }
+
         [HarmonyPatch(typeof(StartOfRound), nameof(StartOfRound.Awake))]
         [HarmonyPostfix]
         static void StartOfRound_Post_Awake(StartOfRound __instance)
@@ -101,6 +124,25 @@ namespace UpturnedVariety
         {
             if (__instance.TryGetComponent(out SubstituteItemName subItemName))
                 HUDManager.Instance.controlTipLines[0].SetText(HUDManager.Instance.controlTipLines[0].text.Replace(__instance.itemProperties.itemName, subItemName.subName));
+        }
+
+        [HarmonyPatch(typeof(BoomboxItem), nameof(BoomboxItem.Start))]
+        [HarmonyPostfix]
+        static void BoomboxItem_Post_Start(BoomboxItem __instance)
+        {
+            if (!Plugin.configBoombox.Value || __instance.mainObjectRenderer == null || StartMatchLever == null || !StartMatchLever.leverHasBeenPulled || !__instance.TryGetComponent(out NetworkObject netObj))
+                return;
+
+            // shiny gray boombox
+            if (new System.Random(StartOfRound.Instance.randomMapSeed * (int)netObj.NetworkObjectId).NextDouble() >= 0.5)
+            {
+                Material[] mats = __instance.mainObjectRenderer.materials;
+                mats[3].SetColor("_Color", SHINY_BOOMBOX);
+                mats[3].SetColor("_BaseColor", SHINY_BOOMBOX);
+                mats[3].SetFloat("_Metallic", 0.6833333f);
+                mats[3].SetFloat("_Smoothness", 0.275f);
+                __instance.mainObjectRenderer.materials = mats;
+            }
         }
     }
 }
